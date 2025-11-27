@@ -338,7 +338,7 @@ contract KindoraPresale is Ownable, ReentrancyGuard {
             }
             finalized = true;
             liquidityAdded = false;
-            emit Finalized(0, marketingWei, 0, 0);
+            emit Finalized(0, leftover0, 0, 0);
             return;
         }
 
