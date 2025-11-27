@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/**'
+      - 'feat/**'
+      - 'fix/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - master
+      - '**'
+
+# Restrict permissions for security
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run coverage
+        run: npm run coverage
+        continue-on-error: true
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/**
+          if-no-files-found: ignore
+
+  slither-analysis:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Slither static analysis
+        uses: crytic/slither-action@v0.4.0
+        id: slither
+        with:
+          sarif: slither-report.sarif
+          slither-args: --json slither-report.json
+          fail-on: none
+        continue-on-error: true
+
+      - name: Upload Slither SARIF report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-sarif
+          path: slither-report.sarif
+          if-no-files-found: ignore
+
+      - name: Upload Slither JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-json
+          path: slither-report.json
+          if-no-files-found: ignore

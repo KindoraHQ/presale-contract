@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Hardhat build artifacts
+cache/
+artifacts/
+typechain-types/
+
+# Coverage
+coverage/
+coverage.json
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Slither output (local runs)
+slither-report.json
+slither-report.sarif
+
+# Misc
+*.log
+npm-debug.log*
