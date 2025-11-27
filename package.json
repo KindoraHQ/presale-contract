@@ -1,0 +1,25 @@
+{
+  "name": "presale-contract",
+  "version": "1.0.0",
+  "description": "Kindora Presale smart contract",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "lint": "solhint 'contracts/**/*.sol'",
+    "coverage": "hardhat coverage"
+  },
+  "keywords": [
+    "solidity",
+    "hardhat",
+    "presale",
+    "smart-contract"
+  ],
+  "author": "KindoraHQ",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^4.9.6",
+    "hardhat": "^2.22.15",
+    "solhint": "^5.0.3"
+  }
+}
