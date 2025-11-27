@@ -86,6 +86,8 @@ contract KindoraPresale is Ownable, ReentrancyGuard {
        State
        ------------------------------------------------------------------------ */
     bool public finalized;
+    bool public liquidityAdded;
+    uint256 public liquidityAmount;
 
     // user => gross BNB contributed (wei)
     mapping(address => uint256) public contributedWei;
@@ -296,6 +298,10 @@ contract KindoraPresale is Ownable, ReentrancyGuard {
         require(presaleEnded(), "NOT_ENDED");
         require(softCapMet(), "SOFT_NOT_MET");
         require(finalized, "NOT_FINALIZED");
+        // Guard: if LP was required, ensure liquidity was actually created
+        if (lpPercent > 0) {
+            require(liquidityAdded, "NO_LIQUIDITY");
+        }
 
         uint256 amt = boughtTokens[msg.sender];
         require(amt > 0, "NO_TOKENS");
@@ -320,66 +326,87 @@ contract KindoraPresale is Ownable, ReentrancyGuard {
         uint256 totalBalance = address(this).balance;
         require(totalBalance > 0, "NO_FUNDS");
 
-        // Compute LP / marketing split (for accounting / event only)
         uint256 lpWei = (totalBalance * lpPercent) / 100;
         uint256 marketingWei = totalBalance - lpWei;
 
-        // Compute LP token amount required
-        uint256 lpTokensNeeded = (lpWei * listingRate) / 1e18;
+        // If no LP allocation, credit leftover to marketing and finalize immediately.
+        if (lpWei == 0) {
+            uint256 leftover0 = address(this).balance;
+            if (leftover0 > 0) {
+                marketingPending += leftover0;
+                emit LeftoverCreditedToMarketing(leftover0);
+            }
+            finalized = true;
+            liquidityAdded = false;
+            emit Finalized(0, marketingWei, 0, 0);
+            return;
+        }
 
-        // Ensure contract has tokens to cover buyer reservations + LP
+        uint256 lpTokensNeeded = (lpWei * listingRate) / 1e18;
+        require(lpTokensNeeded > 0, "LP_TOKENS_ZERO");
+
         uint256 bal = saleToken.balanceOf(address(this));
         require(bal >= tokensSold + lpTokensNeeded, "INSUFFICIENT_TOKENS");
 
-        uint256 liquidity;
-        uint256 amountTokenUsed;
-        uint256 amountETHUsed;
+        uint256 liquidity = 0;
+        uint256 amountTokenUsed = 0;
+        uint256 amountETHUsed = 0;
 
-        if (lpWei > 0 && lpTokensNeeded > 0) {
-            uint256 minTokens = (lpTokensNeeded * (BPS - maxSlippageBps)) / BPS;
-            uint256 minETH = (lpWei * (BPS - maxSlippageBps)) / BPS;
+        uint256 minTokens = (lpTokensNeeded * (BPS - maxSlippageBps)) / BPS;
+        uint256 minETH = (lpWei * (BPS - maxSlippageBps)) / BPS;
 
-            // Approve exact amount to router (safe pattern)
-            saleToken.safeApprove(address(router), 0);
-            saleToken.safeApprove(address(router), lpTokensNeeded);
+        // Approve tokens for router
+        saleToken.safeApprove(address(router), 0);
+        saleToken.safeApprove(address(router), lpTokensNeeded);
 
-            (amountTokenUsed, amountETHUsed, liquidity) =
-                router.addLiquidityETH{value: lpWei}(
-                    address(saleToken),
-                    lpTokensNeeded,
-                    minTokens,
-                    minETH,
-                    DEAD,
-                    block.timestamp + 3600
-                );
+        // Attempt addLiquidityETH; use try/catch to capture failures explicitly.
+        bool lpSuccess = false;
+        try router.addLiquidityETH{value: lpWei}(
+            address(saleToken),
+            lpTokensNeeded,
+            minTokens,
+            minETH,
+            DEAD,
+            block.timestamp + 3600
+        ) returns (uint256 usedTokens, uint256 usedETH, uint256 liq) {
+            amountTokenUsed = usedTokens;
+            amountETHUsed = usedETH;
+            liquidity = liq;
 
-            // After addLiquidityETH, all remaining ETH in the contract
-            // (marketing share + any LP refund) is credited to marketingPending.
-            uint256 leftover = address(this).balance;
-            if (leftover > 0) {
-                marketingPending += leftover;
-                emit LeftoverCreditedToMarketing(leftover);
+            // Basic sanity checks: positive values
+            if (liquidity > 0 && amountETHUsed > 0 && amountTokenUsed > 0) {
+                lpSuccess = true;
             }
-
-            // Reset allowance to zero for safety
+        } catch Error(string memory reason) {
             saleToken.safeApprove(address(router), 0);
-        } else {
-            // If LP is not added, all ETH stays in the contract and is credited to marketing.
-            uint256 leftover = address(this).balance;
-            if (leftover > 0) {
-                marketingPending += leftover;
-                emit LeftoverCreditedToMarketing(leftover);
-            }
+            revert(string(abi.encodePacked("LP_FAILED:", reason)));
+        } catch {
+            saleToken.safeApprove(address(router), 0);
+            revert("LP_FAILED");
         }
 
-        // Transfer extra sale tokens (beyond tokensSold) back to owner
+        // Reset approval
+        saleToken.safeApprove(address(router), 0);
+
+        require(lpSuccess, "LP_NOT_CREATED");
+
+        // Credit leftover ETH (if any)
+        uint256 leftover = address(this).balance;
+        if (leftover > 0) {
+            marketingPending += leftover;
+            emit LeftoverCreditedToMarketing(leftover);
+        }
+
+        // Return extra tokens to owner (keep tokensSold reserved)
         uint256 balAfter = saleToken.balanceOf(address(this));
         if (balAfter > tokensSold) {
             uint256 extra = balAfter - tokensSold;
             saleToken.safeTransfer(owner(), extra);
         }
 
-        // Mark finalized only after successful LP add and token transfers
+        liquidityAdded = true;
+        liquidityAmount = liquidity;
+
         finalized = true;
 
         emit Finalized(lpWei, marketingWei, amountTokenUsed, liquidity);
