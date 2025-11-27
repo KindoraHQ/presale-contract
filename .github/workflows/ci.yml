@@ -6,14 +6,10 @@ on:
       - main
       - master
       - '**'
-    paths:
-      - '**'
   pull_request:
     branches:
       - main
       - master
-      - '**'
-    paths:
       - '**'
 
 jobs:
@@ -143,14 +139,15 @@ jobs:
 
       - name: Run linter
         run: |
+          SOLHINT_CMD="npx solhint 'contracts/**/*.sol' || true"
           if [ "${{ steps.detect.outputs.has_lint_script }}" = "true" ]; then
             npm run lint
           elif command -v solhint &> /dev/null || [ -f "node_modules/.bin/solhint" ]; then
-            npx solhint 'contracts/**/*.sol' || true
+            eval $SOLHINT_CMD
           else
             echo "No linter configured. Installing and running solhint..."
             npm install --save-dev solhint
-            npx solhint 'contracts/**/*.sol' || true
+            eval $SOLHINT_CMD
           fi
 
       - name: Run tests
@@ -171,7 +168,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload coverage artifacts
-        if: always()
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
@@ -187,7 +184,7 @@ jobs:
           slither-args: --json slither-report.json
 
       - name: Upload Slither report
-        if: always()
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: slither-report
