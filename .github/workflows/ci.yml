@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'feature/**'
+      - 'features/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Detect project type
+        id: detect
+        run: |
+          echo "Detecting project type..."
+          PROJECT="unknown"
+          if [ -f "foundry.toml" ] || ( [ -d "lib" ] && ls lib 2>/dev/null | grep -q "forge" ); then
+            PROJECT="foundry"
+          elif [ -f "pyproject.toml" ] || [ -f "brownie-config.yaml" ]; then
+            PROJECT="brownie"
+          elif [ -f "package.json" ]; then
+            PROJECT="node"
+          fi
+          echo "project=$PROJECT" >> $GITHUB_OUTPUT
+          echo "Detected project: $PROJECT"
+
+      - name: Cache node modules
+        if: steps.detect.outputs.project == 'node'
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.node-version }}-
+
+      - name: Install dependencies (Node)
+        if: steps.detect.outputs.project == 'node'
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          elif command -v pnpm >/dev/null 2>&1 && [ -f pnpm-lock.yaml ]; then
+            pnpm install
+          else
+            npm install
+          fi
+
+      - name: Install dependencies (Foundry)
+        if: steps.detect.outputs.project == 'foundry'
+        run: |
+          if ! command -v forge >/dev/null 2>&1; then
+            curl -L https://foundry.paradigm.xyz | bash
+            source ~/.bashrc || true
+            foundryup || true
+          fi
+
+      - name: Install dependencies (Brownie)
+        if: steps.detect.outputs.project == 'brownie'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+
+      - name: Compile (use project scripts if available)
+        id: compile
+        run: |
+          set -e
+          if [ "${{ steps.detect.outputs.project }}" = "node" ]; then
+            if node -e "console.log(require('./package.json').scripts && require('./package.json').scripts.compile ? 'yes' : 'no')" 2>/dev/null | grep -q yes; then
+              npm run compile
+            else
+              npx hardhat compile
+            fi
+          elif [ "${{ steps.detect.outputs.project }}" = "foundry" ]; then
+            forge build
+          elif [ "${{ steps.detect.outputs.project }}" = "brownie" ]; then
+            brownie compile
+          else
+            echo "No compile step for detected project type: ${{ steps.detect.outputs.project }}"
+          fi
+
+      - name: Lint
+        run: |
+          if [ "${{ steps.detect.outputs.project }}" = "node" ]; then
+            if node -e "console.log(require('./package.json').scripts && require('./package.json').scripts.lint ? 'yes' : 'no')" 2>/dev/null | grep -q yes; then
+              npm run lint
+            elif command -v npx >/dev/null 2>&1 && npx solhint --version >/dev/null 2>&1; then
+              npx solhint 'contracts/**/*.sol' || true
+            else
+              echo "No lint script or solhint found; skipping lint"
+            fi
+          else
+            echo "Skipping lint for non-node project type: ${{ steps.detect.outputs.project }}"
+          fi
+
+      - name: Run tests
+        id: test
+        run: |
+          set -e
+          if [ "${{ steps.detect.outputs.project }}" = "node" ]; then
+            if node -e "console.log(require('./package.json').scripts && require('./package.json').scripts.test ? 'yes' : 'no')" 2>/dev/null | grep -q yes; then
+              npm test --silent
+            else
+              npx hardhat test
+            fi
+          elif [ "${{ steps.detect.outputs.project }}" = "foundry" ]; then
+            forge test --json
+          elif [ "${{ steps.detect.outputs.project }}" = "brownie" ]; then
+            brownie test -q
+          else
+            echo "No tests to run for detected project type: ${{ steps.detect.outputs.project }}"
+          fi
+
+      - name: Upload coverage artifact (if present)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            coverage
+            coverage/**
+
+      - name: Run Slither (non-blocking)
+        continue-on-error: true
+        run: |
+          echo "Running Slither inside Docker..."
+          mkdir -p slither-out || true
+          docker run --rm -v "${{ github.workspace }}":/src --workdir /src --entrypoint "" trailofbits/slither:latest sh -c "slither . --json /src/slither-report.json || true"
+        env:
+          CI: true
+
+      - name: Upload Slither report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: slither-report
+          path: slither-report.json
