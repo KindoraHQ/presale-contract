@@ -694,7 +694,7 @@ interface IUniswapV2Router02 {
         returns (uint amountToken, uint amountETH, uint liquidity);
 }
 
-contract KINDORA-PRESALE is Ownable, ReentrancyGuard {
+contract KINDORA_PRESALE is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable saleToken;
