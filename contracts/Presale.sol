@@ -668,7 +668,7 @@ abstract contract ReentrancyGuard {
     }
 }
 
-// File: contracts/KNRStagePresale.sol
+// File: contracts/KINDORA-PRESALE.sol
 
 
 pragma solidity ^0.8.20;
