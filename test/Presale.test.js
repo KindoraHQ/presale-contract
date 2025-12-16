@@ -352,7 +352,7 @@ describe("KINDORA_PRESALE Contract", function () {
       const balanceBefore = await ethers.provider.getBalance(buyer1.address);
       const tx = await presale.connect(buyer1).refund();
       const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasUsed = receipt.gasUsed * (receipt.effectiveGasPrice || receipt.gasPrice || 0n);
 
       const balanceAfter = await ethers.provider.getBalance(buyer1.address);
 
