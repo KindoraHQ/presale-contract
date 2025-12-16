@@ -369,7 +369,7 @@ describe("Presale Contract - Comprehensive Test Suite", function () {
       const initialBalance = await ethers.provider.getBalance(user1.address);
       const tx = await presale.connect(user1).buy({ value: buyAmount });
       const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasCost = receipt.fee; // Ethers v6 uses receipt.fee for total gas cost
       const finalBalance = await ethers.provider.getBalance(user1.address);
 
       expect(await presale.boughtTokens(user1.address)).to.equal(stage1Tokens);
@@ -377,7 +377,7 @@ describe("Presale Contract - Comprehensive Test Suite", function () {
       
       // User should get refund
       const refund = buyAmount - expectedWeiUsed;
-      expect(finalBalance).to.be.closeTo(initialBalance - expectedWeiUsed - gasUsed, toWei(0.001));
+      expect(finalBalance).to.be.closeTo(initialBalance - expectedWeiUsed - gasCost, toWei(0.001));
     });
 
     it("Should transition to next stage when current stage is sold out", async function () {
@@ -525,10 +525,10 @@ describe("Presale Contract - Comprehensive Test Suite", function () {
       const initialBalance = await ethers.provider.getBalance(user1.address);
       const tx = await presale.connect(user1).refund();
       const receipt = await tx.wait();
-      const gasUsed = receipt.gasUsed * receipt.gasPrice;
+      const gasCost = receipt.fee; // Ethers v6 uses receipt.fee for total gas cost
       const finalBalance = await ethers.provider.getBalance(user1.address);
 
-      expect(finalBalance).to.equal(initialBalance + toWei(5) - gasUsed);
+      expect(finalBalance).to.equal(initialBalance + toWei(5) - gasCost);
       expect(await presale.contributedWei(user1.address)).to.equal(0);
       expect(await presale.boughtTokens(user1.address)).to.equal(0);
     });
