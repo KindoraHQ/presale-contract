@@ -1,21 +1,24 @@
+const path = require('path');
+const solc = require('solc');
+
+// Override Hardhat's compiler downloader
 require("@nomicfoundation/hardhat-toolbox");
 
-/** @type import('hardhat/config').HardhatUserConfig */
+const SOLC_VERSION = "0.8.26";
+
 module.exports = {
   solidity: {
     compilers: [
       {
-        version: "0.8.26",
+        version: SOLC_VERSION,
         settings: {
           optimizer: {
             enabled: true,
             runs: 200,
           },
-          viaIR: false,
         },
       }
     ],
-    overrides: {}
   },
   paths: {
     sources: "./contracts",
