@@ -1,0 +1,55 @@
+
+> presale-contract@1.0.0 test
+> hardhat test
+
+
+
+  KINDORA_PRESALE Contract
+    Deployment
+      ✔ Should deploy successfully with correct parameters (510ms)
+      ✔ Should reject zero addresses in constructor
+    Configuration
+      ✔ Should configure stages correctly
+      ✔ Should set times correctly
+      ✔ Should set caps correctly
+      ✔ Should set buy limits correctly
+      ✔ Should set listing rate correctly
+      ✔ Should revert configuration after presale starts
+    Token Deposit
+      ✔ Should allow owner to deposit sale tokens
+    Buying Tokens
+      ✔ Should allow buying tokens during active presale
+      ✔ Should reject purchases below minimum
+      ✔ Should reject purchases above maximum per user
+      ✔ Should progress through multiple stages
+      ✔ Should handle partial stage purchases correctly
+      ✔ Should not allow buying before start time
+      ✔ Should not allow buying after end time
+      ✔ Should handle receive function for direct ETH transfers
+    Refund Mechanism
+      ✔ Should allow refunds when soft cap is not met
+      ✔ Should not allow refunds when soft cap is met
+      ✔ Should not allow refunds before presale ends
+    Claim Functionality
+      ✔ Should allow claiming tokens after successful finalization
+      ✔ Should not allow claiming before finalization
+      ✔ Should not allow claiming with no tokens bought
+    Finalization
+      ✔ Should finalize successfully and add liquidity
+      ✔ Should not allow finalization before presale ends
+      ✔ Should not allow finalization if soft cap not met
+      ✔ Should not allow double finalization
+      ✔ Should correctly split funds between LP and marketing
+    Marketing Withdrawal
+      ✔ Should allow marketing wallet to withdraw funds
+      ✔ Should not allow non-marketing wallet to withdraw
+    Emergency Functions
+      ✔ Should allow owner to recover tokens on failed presale
+      ✔ Should not allow token recovery if soft cap met
+    View Functions
+      ✔ Should return correct presale status
+      ✔ Should return correct soft cap status
+
+
+  34 passing (875ms)
+
