@@ -9,6 +9,13 @@ typechain-types
 cache
 artifacts
 
+# Compiled outputs
+compiled
+artifacts-manual
+compile-contracts.js
+simple-test.js
+hardhat-native.config.js
+
 # IDE
 .idea
 .vscode
