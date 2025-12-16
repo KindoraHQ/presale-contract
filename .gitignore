@@ -1,0 +1,26 @@
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+# Compiled outputs
+compiled
+artifacts-manual
+compile-contracts.js
+simple-test.js
+hardhat-native.config.js
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
